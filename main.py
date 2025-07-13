@@ -540,20 +540,6 @@ class MainWindow(QMainWindow):
             self.logger.info(f"User uploaded shift template: {dest}")
             QMessageBox.information(self, "Shift Template Uploaded", dest)
 
-    def show_support_dialog(self):
-        from PyQt5.QtWidgets import QMessageBox
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Contact Support")
-        msg.setText(
-            "For questions, support, or reporting bugs contact:<br>"
-            "<b>David Briley</b><br>"
-            "<a href=\"mailto:dbriley@sourceenergyservices.com\">dbriley@sourceenergyservices.com</a><br>"
-            "(905) 429-0959"
-        )
-        msg.setTextFormat(Qt.RichText)
-        msg.setFont(QFont("Arial", self.font_size))
-        msg.exec_()
-        self.logger.info("User opened support dialog")
 
     def openReminderSettings(self):
         dlg = ReminderSettingsDialog(
@@ -754,11 +740,16 @@ class MainWindow(QMainWindow):
                 os.startfile(file_path)
                 return
 
-            # Otherwise, open Explorer and select the file
-            subprocess.Popen([
-                "explorer.exe",
-                f"/select,{file_path}"
-            ])
+            # Otherwise, open the parent directory and highlight the file if possible
+            if os.name == "nt":
+                subprocess.Popen([
+                    "explorer.exe",
+                    f"/select,{file_path}"
+                ])
+            elif sys.platform.startswith("darwin"):
+                subprocess.Popen(["open", "-R", file_path])
+            else:
+                subprocess.Popen(["xdg-open", os.path.dirname(file_path)])
         except Exception as e:
             QMessageBox.warning(
                 self,
