@@ -4,7 +4,8 @@ import qtawesome as qta
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QDateEdit, QComboBox, QPushButton, QTableView,
-    QFileSystemModel, QMessageBox, QSizePolicy, QCalendarWidget, QToolButton, QMenu
+    QFileSystemModel, QMessageBox, QSizePolicy, QCalendarWidget, QToolButton, QMenu,
+    QAbstractItemView
 )
 from PyQt5.QtCore import (
     QDate, QTime, Qt, QDir, QSize, QUrl
@@ -163,6 +164,9 @@ def build_body_ui(main_win, parent_layout):
         view = QTableView()
         view.verticalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         view.verticalHeader().setVisible(False)
+        view.setDragEnabled(True)
+        view.setAcceptDrops(False)
+        view.setDragDropMode(QAbstractItemView.DragOnly)
 
         fs_model = QFileSystemModel(main_win)
         fs_model.setNameFilters(["*.xlsx"])
@@ -218,37 +222,26 @@ def build_body_ui(main_win, parent_layout):
                     QMessageBox.warning(view, "Open File Error", f"Could not open file:\n{file_path}\n\n{e}")
         view.doubleClicked.connect(on_double_click)
 
-        # enable right-click context menu for “Open File Location”
+        # Right-click context menu to reveal file or folder in the OS file manager
         view.setContextMenuPolicy(Qt.CustomContextMenu)
-        def on_context_menu(pos):
-            idx = view.indexAt(pos)
-            if not idx.isValid():
-                return
-            file_path = fs_model.filePath(idx)
-            menu = QMenu(view)
-            act  = menu.addAction("Open File Location")
-            act.triggered.connect(lambda _, p=file_path: main_win.open_file_location(p))
-            menu.exec_(view.viewport().mapToGlobal(pos))
-        view.customContextMenuRequested.connect(on_context_menu)
 
-        # --- enable right-click "Open File Location" on viewport ---
-        view.viewport().setContextMenuPolicy(Qt.CustomContextMenu)
         def on_context_menu(pos):
-            idx = view.indexAt(view.viewport().mapFromGlobal(view.viewport().mapToGlobal(pos)))
-            # if clicked on empty row, use current root path
-            if not idx.isValid():
-                folder = root_path
+            # Map the click position to the index under the cursor
+            idx = view.indexAt(pos)
+            if idx.isValid():
+                target = fs_model.filePath(idx)
             else:
-                path = fs_model.filePath(idx)
-                folder = path if os.path.isdir(path) else os.path.dirname(path)
+                # empty area - use the current folder being viewed
+                target = fs_model.rootPath() or root_path
+
             menu = QMenu(view)
             act = menu.addAction("Open File Location")
-            act.triggered.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(folder)))
+            act.triggered.connect(lambda _, p=target: main_win.open_file_location(p))
             menu.exec_(view.viewport().mapToGlobal(pos))
-        view.viewport().customContextMenuRequested.connect(on_context_menu)
+
+        view.customContextMenuRequested.connect(on_context_menu)
 
         # Fix: allow user to go up to parent directory
-        from PyQt5.QtWidgets import QAbstractItemView
         view.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
@@ -364,31 +357,6 @@ def _delete_selected(fs_model, root, main_win):
             QMessageBox.warning(main_win, "Error", f"Could not delete {p}:\n{e}")
 
     fs_model.setRootPath("")
-    fs_model.setRootPath(root)
-    fs_model.setRootPath(root)
-    fs_model.setRootPath(root)
-    fs_model.setRootPath(root)
-    if QMessageBox.question(
-        main_win,
-        "Confirm Deletion",
-        prompt,
-        QMessageBox.Yes | QMessageBox.No,
-        QMessageBox.No
-    ) != QMessageBox.Yes:
-        return
-
-    for p in to_delete:
-        try:
-            os.remove(p)
-            logging.info(f"User deleted file: {p}")
-        except Exception as e:
-            logging.error(f"Failed to delete file {p}: {e}")
-            QMessageBox.warning(main_win, "Error", f"Could not delete {p}:\n{e}")
-
-    fs_model.setRootPath("")
-    fs_model.setRootPath(root)
-    fs_model.setRootPath(root)
-    fs_model.setRootPath(root)
     fs_model.setRootPath(root)
 
 class AboutDialog(QDialog):
